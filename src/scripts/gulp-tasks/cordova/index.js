@@ -1,8 +1,10 @@
 'use strict';
-var path = require('path'),
+var gulp = require('gulp'),
+    path = require('path'),
     gutil = require('gulp-util'),
     cordova = require('cordova'),
     CordovaError = require('cordova/src/CordovaError'),
+    xeditor = require("gulp-xml-editor"),
     Q = require('q');
 
 var red = gutil.colors.red,
@@ -70,6 +72,15 @@ module.exports = function(paths, pkg){
         cordovaCdToRoot();
         promise = new Q(cordova.platform('add', 'android'));
         promise.then(cb);
+    };
+
+    this.fixUpManifest = function (cb) { 
+        return gulp.src(paths.build.cordova_android+"/AndroidManifest.xml")
+            .pipe(xeditor([
+              {path: '//manifest', attr: {'android:versionName': pkg.version }},
+              {path: '//manifest', attr: {'android:versionCode': pkg.apkVersion}}
+              ])
+            ).pipe(gulp.dest(paths.build.cordova_android));
     };
 
     this.addPlugins = function(cb){

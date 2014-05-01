@@ -30,6 +30,7 @@ var paths = {
             images: 'dist/www/img/',
             scss: 'dist/www/css/src/styles/',
             cordova: 'dist/cordova/',
+            cordova_android: 'dist/cordova/platforms/android',
             cordova_www: 'dist/cordova/www/'
         }
     };
@@ -98,7 +99,9 @@ gulp.task('cordova:setup',['cordova:addPlugins'], tasks.cordova.setup);
 
 gulp.task('cordova:build', ['web:build'], tasks.cordova.build);
 gulp.task('cordova:run', tasks.cordova.run);
+gulp.task('cordova:fixup', tasks.cordova.fixUpManifest);
 gulp.task('cordova:release', tasks.cordova.release);
+
 
 //default
 gulp.task('default', function() {});
