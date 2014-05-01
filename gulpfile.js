@@ -12,6 +12,7 @@ var paths = {
         sources: {
             root: 'src/',
             layouts: 'src/templates/layouts/',
+            icons: 'src/res/',
             partials: 'src/templates/partials/*.hbs',
             pages: 'src/templates/pages/*.hbs',
             data: 'src/data/',
@@ -30,7 +31,9 @@ var paths = {
             images: 'dist/www/img/',
             scss: 'dist/www/css/src/styles/',
             cordova: 'dist/cordova/',
-            cordova_android: 'dist/cordova/platforms/android',
+            cordova_android: 'dist/cordova/platforms/android/',
+            cordova_android_res: 'dist/cordova/platforms/android/res/',
+            cordova_res: 'src/res/',
             cordova_www: 'dist/cordova/www/'
         }
     };
@@ -100,6 +103,7 @@ gulp.task('cordova:setup',['cordova:addPlugins'], tasks.cordova.setup);
 gulp.task('cordova:build', ['web:build'], tasks.cordova.build);
 gulp.task('cordova:run', tasks.cordova.run);
 gulp.task('cordova:fixup', tasks.cordova.fixUpManifest);
+gulp.task('cordova:fixupicons', tasks.cordova.fixUpIcons);
 gulp.task('cordova:release', tasks.cordova.release);
 
 

@@ -75,13 +75,19 @@ module.exports = function(paths, pkg){
     };
 
     this.fixUpManifest = function (cb) { 
-        return gulp.src(paths.build.cordova_android+"/AndroidManifest.xml")
+        return gulp.src(paths.build.cordova_android+"AndroidManifest.xml")
             .pipe(xeditor([
               {path: '//manifest', attr: {'android:versionName': pkg.version }},
               {path: '//manifest', attr: {'android:versionCode': pkg.apkVersion}}
               ])
             ).pipe(gulp.dest(paths.build.cordova_android));
     };
+
+    this.fixUpIcons = function (cb) { 
+        return gulp.src(paths.sources.icons+"**/*.png")
+            .pipe(gulp.dest(paths.build.cordova_android_res));
+    };
+
 
     this.addPlugins = function(cb){
         var promise,
