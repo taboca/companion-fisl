@@ -57,13 +57,14 @@ module.exports = function(paths, pkg){
         var name = pkg.name,
             dir = paths.build.cordova,
             id = pkg.cordovaConfig.id,
+            ver = pkg.version,
             cfg = pkg.cordovaConfig.extra,
             promise;
 
         if (cfg && cfg.lib && cfg.lib.www && cfg.lib.www.uri){
             cfg.lib.www.uri = path.resolve(dir, cfg.lib.www.uri);
         }
-        promise = new Q(cordova.create(dir, id, name, cfg));
+        promise = new Q(cordova.create(dir, id, name, ver, cfg));
         promise.then(cb);
     };
 
@@ -72,6 +73,14 @@ module.exports = function(paths, pkg){
         cordovaCdToRoot();
         promise = new Q(cordova.platform('add', 'android'));
         promise.then(cb);
+    };
+
+    this.fixUpConfig = function (cb) { 
+        return gulp.src(paths.build.cordova+"config.xml")
+            .pipe(xeditor([
+              {path: '//widget', attr: {'version': pkg.version }}
+              ])
+            ).pipe(gulp.dest(paths.build.cordova));
     };
 
     this.fixUpManifest = function (cb) { 

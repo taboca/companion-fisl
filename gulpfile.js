@@ -103,6 +103,7 @@ gulp.task('cordova:setup',['cordova:addPlugins'], tasks.cordova.setup);
 gulp.task('cordova:build', ['web:build'], tasks.cordova.build);
 gulp.task('cordova:run', tasks.cordova.run);
 gulp.task('cordova:fixup', tasks.cordova.fixUpManifest);
+gulp.task('cordova:fixupconfig', tasks.cordova.fixUpConfig);
 gulp.task('cordova:fixupicons', tasks.cordova.fixUpIcons);
 gulp.task('cordova:release', tasks.cordova.release);
 
