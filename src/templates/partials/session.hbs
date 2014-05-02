@@ -39,10 +39,27 @@
         id="session-info-{{this.id}}"
         class="session-info collapse"
         >
+        <h5 class="area-{{this.areaID}}">
+            <span class="zone-name">
+            {{#withItem @root.schedule.zones key=this.zoneID}}
+                {{this.name}}
+            {{/withItem}}
+            </span>
+             >
+            <span class="area-name">
+            {{#withItem @root.schedule.areas key=this.areaID}}
+                {{this.name}}
+            {{/withItem}}
+            </span>
+        </h5>
+        <p class="session-time-text">
+            das {{formatDate this.start "HH:MM"}} às
+            {{formatEndDate this.start this.duration "HH:MM"}}
+            — <span class="time-icon"></span> {{this.duration}} min
+        </p>
         <p class="session-abstract panel-body">
             {{this.abstract}}
         </p>
-
         <ul class="nav nav-pills">
             <li>
                 <a class="room-link" href="#">
@@ -58,18 +75,32 @@
                     Add to calendar
                 </a>
             </li>
+        </ul>
         {{#withItem @root.schedule.presenters key=this.id}}
+        {{#if this.length}}
+        <h5>
+            Apresentação
+{{!--
+            {{#is this.length '<' 2}}
+            Responsável
+            {{else}}
+            Responsáveis
+            {{/is}}
+ --}}
+        </h5>
+        <ul>
         {{#each this}}
             <li class="author {{#if this.main}}main{{/if}}">
-                <a href="#" class="author-link">
+                <span href="#" class="author-link" data-id="{{this.id}}">
                     <span class="author-icon"></span>
                     <span class="author-name">
                         {{this.name}}
                     </span>
-                </a>
+                </span>
             </li>
         {{/each}}
-        {{/withItem}}
         </ul>
+        {{/if}}
+        {{/withItem}}
     </dd>
 </{{session_tag}}>

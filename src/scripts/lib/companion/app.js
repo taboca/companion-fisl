@@ -16,6 +16,20 @@ var _ = {
     };
 
 var POLL_INTERVAL = 1 * 60 * 1000; //1 minute
+var fakeTotal = 201680;  //FISL XML has around 200KB
+
+
+//from http://stackoverflow.com/a/20392392/2052311
+function tryParseJSON (jsonString){
+    try {
+        var o = JSON.parse(jsonString);
+        if (o && typeof o === 'object' && o !== null) {
+            return o;
+        }
+    }catch (e) {
+    }
+    return false;
+}
 
 module.exports = function($, FISLParser, templates){
     var isCordova = document.URL.substring(0,4) === 'file',
@@ -31,7 +45,8 @@ module.exports = function($, FISLParser, templates){
         updateInfo,
         updatesLog = [],
         mapPan,
-        mapMinScale;
+        mapMinScale,
+        firstFetchFailed = true;
 
     var isSessionFavorite = function(session){
         return bookmarkedSessions[session.sessionId] !== undefined;
@@ -148,6 +163,10 @@ module.exports = function($, FISLParser, templates){
                     scheduleData.zones
             );
         });
+
+        //refresh buttons
+        $('.refresh-feed').off();
+        $('.refresh-feed').click(manualFetchClicked);
 
         // bookmark buttons
         $('.bookmark-button').click(bookmarkButtonClicked);
@@ -321,12 +340,19 @@ module.exports = function($, FISLParser, templates){
         });
     };
 
+    var displayPanel = function(panelName){
+        var tabName = '#'+panelName+'-tab',
+            viewName = '#'+panelName+'-view';
+        $('#app-menu .navbar-nav > li.active').removeClass('active');
+        $(tabName).addClass('active');
+        $('.app-panel').removeClass('selected');
+        $(viewName).addClass('selected');
+
+    };
+
     var openMapTab = function(roomID){
         //select map panel
-        $('#app-menu .navbar-nav > li.active').removeClass('active');
-        $('#map-tab').addClass('active');
-        $('.app-panel').removeClass('selected');
-        $('#map-view').addClass('selected');
+        displayPanel('map');
         console.log('openMapTab roomID='+roomID);
         // mapPan.reset();
         // mapPan.resetDimensions();
@@ -356,6 +382,19 @@ module.exports = function($, FISLParser, templates){
         event.preventDefault();
         buttonElement.addClass('loading');
         loadFeed();
+    };
+
+    var updateMenuSyncMessage = function(){
+        console.log('updateMenuSyncMessage')
+        //update sync time on each dropdown open
+        var updateInfoContainer = $('#last-sync-menu-header'),
+                template = templates.last_sync_time;
+        updateInfoContainer.html(
+            template({
+                lastFetchTime: updateInfo.time
+            })
+        );
+        console.log('sync display updated');
     };
 
     var appTabClicked = function (event){
@@ -393,8 +432,10 @@ module.exports = function($, FISLParser, templates){
         } else if (sectionName === 'map'){
             console.log('Map tab clicked');
             openMapTab();
+        } else if (sectionName === 'menu'){
+            displayPanel('menu');
+            updateMenuSyncMessage();
         }
-
     };
 
     var setupAppHeaderBar = function(){
@@ -404,24 +445,13 @@ module.exports = function($, FISLParser, templates){
                 '#schedule-section-link',
                 '#favorites-section-link',
                 '#map-section-link',
-                '#notifications-section-link'
+                '#notifications-section-link',
+                '#menu-section-link'
             ];
         $(mainSections.join(',')).click(appTabClicked);
 
         //map pan and zoom setup
         initMapPanZoom();
-
-        //update sync time on each dropdown open
-        $('#app-menu').on('show.bs.dropdown', function(){
-            var updateInfoContainer = $('#last-sync-menu-header'),
-                template = templates.last_sync_time;
-            updateInfoContainer.html(
-                template({
-                    lastFetchTime: updateInfo.time
-                })
-            );
-            console.log('sync display updated');
-        });
 
         //developer submenu toggle
         $('#developer-submenu-toggle').click(function(e){
@@ -431,8 +461,6 @@ module.exports = function($, FISLParser, templates){
             affectedItems.toggleClass('collapse');
             e.stopPropagation();
         });
-        //refresh button
-        $('#refresh-feed').click(manualFetchClicked);
 
         //list view toggle (lists vs tables)
         $('#list-view-toggle input[type="radio"]').on('change', scheduleViewSwitchClicked);
@@ -484,7 +512,7 @@ module.exports = function($, FISLParser, templates){
             timestamp = Date.now();
 
         //removed sessions
-        console.log('Removed sessions:'+removedSessions);
+        // console.log('Removed sessions:'+removedSessions);
         _.forEach(removedSessions, function(sessionID){
             recentChanges.push({
                 sessionId: sessionID,
@@ -500,7 +528,7 @@ module.exports = function($, FISLParser, templates){
                 var oldSession = previousScheduleData.sessions[session.id],
                     changed = !_.isEqual(session, oldSession);
                 if (changed){
-                    console.log(oldSession.title + ' has changed');
+                    // console.log(oldSession.title + ' has changed');
                     if (oldSession.title !== session.title){
                         recentChanges.push({
                             sessionId: session.id,
@@ -533,7 +561,7 @@ module.exports = function($, FISLParser, templates){
                     }
                 }
             }else{
-                console.log('Session '+session.id+' is a new one!');
+                // console.log('Session '+session.id+' is a new one!');
                 recentChanges.push({
                     sessionId: session.id,
                     sessionTitle: session.title,
@@ -543,11 +571,11 @@ module.exports = function($, FISLParser, templates){
             }
         });
 
-        console.log('latest changes: '+JSON.stringify(recentChanges, null, '  '));
+        // console.log('latest changes: '+JSON.stringify(recentChanges, null, '  '));
         updatesLog = _.union(recentChanges.reverse(), updatesLog);
 
         companionStore.saveUpdatesLog(updatesLog, function(dataSaved){
-            console.log('all changes saved: '+JSON.stringify(dataSaved, null, '  '));
+            // console.log('all changes saved: '+JSON.stringify(dataSaved, null, '  '));
         });
         redrawNotifications();
     };
@@ -556,6 +584,7 @@ module.exports = function($, FISLParser, templates){
         var timestamp = Date.now();
         companionStore.updateXML(feedData, timestamp, function(){
             console.log('feed updated locally');
+            updateMenuSyncMessage();
         });
         companionStore.getLastFetchInfo(function(info){
             console.log('local updateInfo loaded:',info);
@@ -568,9 +597,14 @@ module.exports = function($, FISLParser, templates){
         var isRefresh = $('#schedule-view').length > 0,
             view = isRefresh ? $('body').attr('data-view-mode') : defaultView;
         previousScheduleData = scheduleData;
-        scheduleData = parser.parse(data);
+        scheduleData = tryParseJSON(data);
         feedData = data;
+        firstFetchFailed = false;
 
+        if (scheduleData === false){
+            console.log('the loaded feed is not a json, parse the xml');
+            scheduleData = parser.parse(data);
+        }
         console.log('XML size='+data.length);
         if (xhr !== null){
             console.log('XML all headers='+xhr.getAllResponseHeaders());
@@ -599,7 +633,7 @@ module.exports = function($, FISLParser, templates){
         initSessions();
     };
 
-    var loadFeed = function(){
+    var loadFeed = function(anotherURL){
         console.log('loadFeed');
         var appElement = $('#app'),
             feedURL = appElement.data('feed-url'),
@@ -612,6 +646,9 @@ module.exports = function($, FISLParser, templates){
         if (isRefresh && devSyncMode){
             feedURL = 'data/schedule2.xml';
         }
+        if (anotherURL) {
+            feedURL = anotherURL;
+        }
         //1. fetch feed
 
         console.log('Loading ' + feedURL + '...');
@@ -623,13 +660,11 @@ module.exports = function($, FISLParser, templates){
                 xhr.addEventListener('progress', function(evt) {
                     var percentComplete,
                         total,
-                        fakeTotal,
                         percentString;
                     if (evt.lengthComputable) {
                         total = evt.total;
                     }else{
                         //FISL server reports 18446744073709552000 as total, which is probably wrong
-                        fakeTotal = 173893;  //FISL XML has around 173893 bytes -> less than 200KB
                         total = fakeTotal;
                     }
                     percentComplete = Math.min((evt.loaded / total), 1);
@@ -646,9 +681,16 @@ module.exports = function($, FISLParser, templates){
         //2. parse feed
         .done(feedLoaded)
         .fail(function() {
-            console.log('error');
+            console.log('request failed:'+this.url);
+            if (firstFetchFailed && this.url !== localFeed){
+                console.log('fetch packaged backup at '+ localFeed);
+                loadFeed(localFeed);
+            }else{
+                console.log('the request failed but the user should have something cached');
+                console.log('some kind of visual hint might be useful');
+            }
         }).always(function() {
-            $('#refresh-feed').removeClass('loading');
+            $('.refresh-feed').removeClass('loading');
         });
     };
 
@@ -667,12 +709,12 @@ module.exports = function($, FISLParser, templates){
         console.log('device ready, debug:'+devSyncMode);
         //load stored bookmarks
         companionStore.bookmarks(function(storedBookmarks){
-            console.log('stored bookmarks:'+JSON.stringify(storedBookmarks));
+            // console.log('stored bookmarks:'+JSON.stringify(storedBookmarks));
             bookmarkedSessions = (storedBookmarks !== null) ? storedBookmarks : {};
             //then load stored notifications history
             companionStore.updates(function(storedUpdates){
                 updatesLog = (storedUpdates !== null) ? storedUpdates : [];
-                console.log('stored Updates Log:'+JSON.stringify(storedUpdates));
+                // console.log('stored Updates Log:'+JSON.stringify(storedUpdates));
                 //then load information about last fetched xml
                 companionStore.getLastFetchInfo(function(info){
                     console.log('local updateInfo loaded:',info);
