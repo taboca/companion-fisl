@@ -4,6 +4,8 @@ var pkg = require('../../../../package.json');
 var cordovaCalendarHelper = require('./cordova_calendar');
 var companionStore = require('./store');
 var panZoom = require('../jquery.panzoom/jquery.panzoom');
+var attachFastClick = require('fastclick');
+
 
 //custom lodash
 var _ = {
@@ -21,6 +23,9 @@ var fakeTotal = 201680;  //FISL XML has around 200KB
 
 //from http://stackoverflow.com/a/20392392/2052311
 function tryParseJSON (jsonString){
+    if (typeof jsonString === 'object'){
+        return jsonString;
+    }
     try {
         var o = JSON.parse(jsonString);
         if (o && typeof o === 'object' && o !== null) {
@@ -56,6 +61,29 @@ module.exports = function($, FISLParser, templates){
         return bookmarkedSessions[session.sessionId] === undefined;
     };
 
+    //updates splash screen loading message
+    var loadingMessage = function(text){
+        console.log('[Loading message] '+text);
+        $('#loading-message').html(text);
+    };
+
+    var schedulePopulated = function(isRefresh){
+        var view = isRefresh ? $('body').attr('data-view-mode') : defaultView;
+        console.log('schedulePopulated');
+        loadingMessage('Aguarde, inicializando interfaces ');
+        if (view === 'list'){
+            initListView();
+        }else{
+            initTableView();
+        }
+        //setup App main bar buttons
+        if (!isRefresh){
+            setupAppHeaderBar();
+        }
+        //bind session element events
+        initSessions();
+    };
+
     var populateSchedule = function(isRefresh){
         // this function is also used for rendering the apps UI on first load
         // (template app.hbs instead of just the partial schedule.hbs)
@@ -74,10 +102,14 @@ module.exports = function($, FISLParser, templates){
             },
             html;
         console.log('populateSchedule '+view);
+        loadingMessage('Aguarde, montando a grade ');
         html = template(templateData);
-        // console.log(html);
-        destinationElement.html(html);
+        window.setTimeout(function(){
+            destinationElement.html(html);
+            schedulePopulated(isRefresh);
+        }, 0);
     };
+
 
     //the time nav must fit into 1 single line, so we sum the width of all
     //li's and make it the with of the container ul
@@ -134,15 +166,21 @@ module.exports = function($, FISLParser, templates){
         var body = $('body');
         console.log('initListView');
         body.attr('data-view-mode', 'list');
-        setupTimeNav();
-        // enable scrollspy!
-        body.scrollspy({
-            target: '#time-nav',
-            offset: boddyPaddingTop
-        });
-        //bind on nav update event
-        body.off('activate.bs.scrollspy');
-        body.on('activate.bs.scrollspy', timeNavUpdated);
+        if ($('#favorites-tab.active').length){
+            $('#time-nav').hide();
+        }else{
+            $('#time-nav').show();
+            setupTimeNav();
+            // enable scrollspy!
+            body.scrollspy({
+                target: '#time-nav',
+                offset: boddyPaddingTop
+            });
+            //bind on nav update event
+            body.off('activate.bs.scrollspy');
+            body.on('activate.bs.scrollspy', timeNavUpdated);
+            body.scrollspy('refresh');
+        }
     };
 
     var initTableView = function(){
@@ -196,7 +234,8 @@ module.exports = function($, FISLParser, templates){
         $('.session .collapse').on('shown.bs.collapse', function () {
             console.log('shown.bs.collapse');
             var colapseElement = $(this),
-                body = $('html,body'),
+                body = $('body'),
+                view = body.attr('data-view-mode'),
                 sessionElement = colapseElement.parents('.session').first(),
                 sessionOffsetTop = sessionElement.offset().top,
                 //using body.scrollTop() to get current position of the main scroll doesnt work on android webview
@@ -211,12 +250,20 @@ module.exports = function($, FISLParser, templates){
                     animationTime
                 );
             }
+            if (view === 'list'){
+                body.scrollspy('refresh');
+            }
         });
         $('.session .collapse').off('hidden.bs.collapse');
         $('.session .collapse').on('hidden.bs.collapse', function () {
             var colapseElement = $(this),
+                body = $('body'),
+                view = body.attr('data-view-mode'),
                 sessionElement = colapseElement.parents('.session').first();
             sessionElement.removeClass('opened');
+            if (view === 'list'){
+                body.scrollspy('refresh');
+            }
         });
     };
 
@@ -237,11 +284,6 @@ module.exports = function($, FISLParser, templates){
 
     var scheduleViewSwitchClicked = function(){
         var radioElement = $(this),
-            // radioValue = radioElement.val(),
-            // activeButton = switchElement.find('.active'),
-            // isListActive = activeButton.hasClass('list-view-button'),
-            // inactiveButton = isListActive ? switchElement.find('.table-view-button') : switchElement.find('.list-view-button'),
-            // nextView = isListActive ? 'table' : 'list',
             nextView = radioElement.val(),
             destinationElement = $('#schedule-view'),
             templateData = {
@@ -260,13 +302,6 @@ module.exports = function($, FISLParser, templates){
             destinationElement.addClass('schedule--table');
         }
 
-        // console.log('scheduleViewSwitchClicked ',nextView, activeButton, inactiveButton);
-        // activeButton.removeAttr('disabled');
-        // activeButton.removeClass('active');
-        // inactiveButton.addClass('active');
-        // inactiveButton.attr('disabled','true');
-
-
         destinationElement.html('Aguarde…');
         window.setTimeout(function(){
             var destinationElement = $('#schedule-view'),
@@ -275,16 +310,10 @@ module.exports = function($, FISLParser, templates){
         console.log('nextView in',nextView);
             destinationElement.html(html);
             if (nextView === 'list') {
-                console.log('a');
                 initListView();
-                // body.scrollspy('refresh');
             }else{
-                console.log('a2');
                 initTableView();
             }
-            //refresh this dom element so Android browser can display the new icon
-            $('#schedule-section-link .icon').hide();
-            setTimeout(function() { $('#schedule-section-link .icon').show(); }, 0);
             initSessions();
         }, 1);
     };
@@ -329,10 +358,10 @@ module.exports = function($, FISLParser, templates){
     };
 
     var initMapPanZoom = function(){
-        var imageWidth = 2135;
+        var imageWidth = 533;
         var containerWidth = $('body').width() * 0.9;
         console.log(containerWidth);
-        mapMinScale = containerWidth / imageWidth;
+        mapMinScale = (containerWidth / imageWidth) * 0.8;
         console.log('initMapPanZoom, minscale = '+mapMinScale);
         mapPan = new panZoom($('.map-base')[0],{
             minScale: mapMinScale,
@@ -357,7 +386,7 @@ module.exports = function($, FISLParser, templates){
         // mapPan.reset();
         // mapPan.resetDimensions();
         console.log('MapPanZoom, zoom = '+mapMinScale);
-        mapPan.zoom(mapMinScale * 2);
+        mapPan.zoom(mapMinScale * 1.2);
     };
 
     var mapLinkClicked = function(event){
@@ -385,7 +414,7 @@ module.exports = function($, FISLParser, templates){
     };
 
     var updateMenuSyncMessage = function(){
-        console.log('updateMenuSyncMessage')
+        console.log('updateMenuSyncMessage');
         //update sync time on each dropdown open
         var updateInfoContainer = $('#last-sync-menu-header'),
                 template = templates.last_sync_time;
@@ -415,6 +444,7 @@ module.exports = function($, FISLParser, templates){
         //hide all app panels
         $('.app-panel').removeClass('selected');
 
+        window.setTimeout(function(){
         //different actions depending on which tab selected
         if ( (sectionName === 'schedule') || (sectionName === 'favorites') ){
             applyBookmarksFilter();
@@ -436,6 +466,7 @@ module.exports = function($, FISLParser, templates){
             displayPanel('menu');
             updateMenuSyncMessage();
         }
+        }, 0);
     };
 
     var setupAppHeaderBar = function(){
@@ -581,9 +612,10 @@ module.exports = function($, FISLParser, templates){
     };
 
     var updateLocalFeed = function(){
-        var timestamp = Date.now();
-        companionStore.updateXML(feedData, timestamp, function(){
-            console.log('feed updated locally');
+        var timestamp = scheduleData.parsed_date ? scheduleData.parsed_date : Date.now();
+
+        companionStore.updateFeed(scheduleData, timestamp, function(storedData){
+            console.log('feed updated locally ',storedData);
             updateMenuSyncMessage();
         });
         companionStore.getLastFetchInfo(function(info){
@@ -594,8 +626,7 @@ module.exports = function($, FISLParser, templates){
     };
 
     var feedLoaded = function(data, textStatus, xhr, fromCache) {
-        var isRefresh = $('#schedule-view').length > 0,
-            view = isRefresh ? $('body').attr('data-view-mode') : defaultView;
+        var isRefresh = $('#schedule-view').length > 0;
         previousScheduleData = scheduleData;
         scheduleData = tryParseJSON(data);
         feedData = data;
@@ -617,20 +648,7 @@ module.exports = function($, FISLParser, templates){
             //store fetched data and metadata
             updateLocalFeed();
         }
-        //3. render schedule
         populateSchedule(isRefresh);
-        //4. start framework - example: $(document).foundation()
-        if (view === 'list'){
-            initListView();
-        }else{
-            initTableView();
-        }
-        //setup App main bar buttons
-        if (!isRefresh){
-            setupAppHeaderBar();
-        }
-        //bind session element events
-        initSessions();
     };
 
     var loadFeed = function(anotherURL){
@@ -639,6 +657,8 @@ module.exports = function($, FISLParser, templates){
             feedURL = appElement.data('feed-url'),
             localFeed = appElement.data('local-feed-url'),
             isRefresh = $('#schedule-view').length > 0;
+
+        loadingMessage('Aguarde, atualizando a grade ');
 
         if (!isCordova) {
             feedURL = localFeed;
@@ -699,7 +719,7 @@ module.exports = function($, FISLParser, templates){
         if (xmlData !== null){
             feedLoaded(xmlData, 200, null, true);
         }else{
-            console.log('local storage has update nfo but not the actual feed');
+            console.log('local storage has update info but not the actual feed');
             loadFeed();
         }
     };
@@ -708,6 +728,10 @@ module.exports = function($, FISLParser, templates){
         $('#splash-version').text(pkg.version);
         devSyncMode = ($('#app').data('sync-dev-mode') === 'on');
         console.log('device ready, debug:'+devSyncMode);
+        loadingMessage('Aguarde, carregando dados locais ');
+
+        attachFastClick(document.body);
+
         //load stored bookmarks
         companionStore.bookmarks(function(storedBookmarks){
             // console.log('stored bookmarks:'+JSON.stringify(storedBookmarks));
@@ -722,10 +746,12 @@ module.exports = function($, FISLParser, templates){
                     updateInfo = info;
                     if (info === null){
                         //no feed information was found, this is the first run
+                        console.log('no feed information was found, this is the first run');
                         loadFeed();
                     }else{
                         //load the stored xml
-                        companionStore.cachedXML(loadCached);
+                        console.log('loading stored feed');
+                        companionStore.cachedFeed(loadCached);
                         if (Date.now() - info.time > POLL_INTERVAL){
                             console.log('needs to poll, latest fetch: '+info.time);
                         }
