@@ -1,7 +1,7 @@
 {
   "name": "FISL15",
-  "apkVersion": "5",
-  "version": "0.5.0",
+  "apkVersion": "6",
+  "version": "0.5.2",
   "description": "Companion is a mobile application to track schedules of conferences and events.",
   "scripts": {
     "cordova-setup": "./node_modules/.bin/gulp cordova:setup",
@@ -37,7 +37,7 @@
     "fastclick": "^1.0.1",
     "glob": "^3.2.9",
     "gulp": "^3.6.0",
-    "gulp-assemble": "^0.1.4",
+    "gulp-assemble": "0.1.5",
     "gulp-autoprefixer": "0.0.6",
     "gulp-sass": "^0.7.1",
     "gulp-util": "^2.2.14",
