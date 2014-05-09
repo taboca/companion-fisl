@@ -11,6 +11,7 @@ var attachFastClick = require('fastclick');
 var _ = {
         forEach: require('lodash-node/modern/collections/forEach'),
         filter: require('lodash-node/modern/collections/filter'),
+        pluck: require('lodash-node/modern/collections/pluck'),
         difference: require('lodash-node/modern/arrays/difference'),
         union: require('lodash-node/modern/arrays/union'),
         isEqual: require('lodash-node/modern/objects/isEqual'),
@@ -67,6 +68,41 @@ module.exports = function($, FISLParser, templates){
         $('#loading-message').html(text);
     };
 
+    var scrollToCurrentTime = function(){
+        console.log('scrollToCurrentTime');
+        var now = new Date(),
+            timestamp = now.getTime(),
+            hour = now.getHours(),
+            closingTimes = _.pluck(scheduleData.days, 'closingTime'),
+            currentDayIndex = 0,
+            timeAnchor,
+            anchorOffset,
+            animationTime = 700, //miliseconds
+            body = $('html, body');
+        for (var i = 0; i < closingTimes.length; i++) {
+            var closingTime = closingTimes[i];
+            if (timestamp < closingTime){
+                currentDayIndex = i;
+                break;
+            }
+        }
+        timeAnchor = $('#day-'+ currentDayIndex +'-time-' + hour);
+        console.log('#day-'+ currentDayIndex +'-time-' + hour);
+        if (!timeAnchor.length){
+            timeAnchor = $('#day-'+ currentDayIndex);
+            console.log('#day-'+ currentDayIndex);
+        }
+        anchorOffset = timeAnchor.offset();
+        if (anchorOffset.top) {
+            body.animate(
+                {
+                    scrollTop: timeAnchor.offset().top - boddyPaddingTop + 1
+                },
+                animationTime
+            );
+        }
+    };
+
     var schedulePopulated = function(isRefresh){
         var view = isRefresh ? $('body').attr('data-view-mode') : defaultView;
         console.log('schedulePopulated');
@@ -82,6 +118,9 @@ module.exports = function($, FISLParser, templates){
         }
         //bind session element events
         initSessions();
+        if (!isRefresh){
+            scrollToCurrentTime();
+        }
     };
 
     var populateSchedule = function(isRefresh){
@@ -175,9 +214,11 @@ module.exports = function($, FISLParser, templates){
 
     var initSessions = function(){
         // time navigation buttons (list view)
+        $('#time-nav li a').off();
         $('#time-nav li a').click(timeNavClicked);
 
         // add to calendar buttons
+        $('.calendar-add-button').off();
         $('.calendar-add-button').click(function(event){
             cordovaFunctions.addToCalendarButtonClicked(
                     event,
@@ -191,6 +232,7 @@ module.exports = function($, FISLParser, templates){
         $('.refresh-feed').click(manualFetchClicked);
 
         // bookmark buttons
+        $('.bookmark-button').off();
         $('.bookmark-button').click(bookmarkButtonClicked);
 
         //add favorite class to all bookmarked sessions
@@ -205,6 +247,7 @@ module.exports = function($, FISLParser, templates){
         applyBookmarksFilter();
 
         // map links
+        $('.room-link').off();
         $('.room-link').click(mapLinkClicked);
 
         //setup collapsable sessions in and out events
@@ -434,6 +477,7 @@ module.exports = function($, FISLParser, templates){
             $('#schedule-view').addClass('selected');
             if (view === 'list'){
                 initListView();
+                scrollToCurrentTime();
             }else{
                 initTableView();
             }
